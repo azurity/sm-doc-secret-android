@@ -26,7 +26,7 @@ public class ServShouter {
         super.finalize();
     }
 
-    public void start() {
+    public void start(final String sign_name) {
         if (th != null) {
             th.interrupt();
         }
@@ -37,7 +37,7 @@ public class ServShouter {
                 try {
                     int count = 0;
                     while (!close && socket != null) {
-                        byte[] data = "SM-DOC-SERV\nandroid".getBytes();
+                        byte[] data = ("SM-DOC-SERV\n" + sign_name).getBytes();
                         DatagramPacket pack = new DatagramPacket(data, data.length, InetAddress.getByName("255.255.255.255"), 9001);
                         socket.send(pack);
                         if (count < 3) {//启动；连发4次

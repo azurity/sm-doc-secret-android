@@ -112,16 +112,16 @@ public class Server {
         if (buffer.length != 256) {
             return;
         }
-        synchronized (sessions) {//保证socket存在
+        /*synchronized (sessions) {//保证socket存在
             if (find(session) == null) {
                 return;
-            }
+            }*/
             send(session, buffer);
-            if (!keep) {
+            /*if (!keep) {
                 remove(session);
                 close(session);
             }
-        }
+        }*/
     }
 
     private void accept() {
@@ -150,7 +150,7 @@ public class Server {
                 }
             }
             try {
-                Thread.sleep(500);//半秒一次
+                Thread.sleep(5000);//5秒一次
             } catch (Exception e) {
             }
         }

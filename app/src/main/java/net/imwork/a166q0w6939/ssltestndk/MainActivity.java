@@ -1,14 +1,21 @@
 package net.imwork.a166q0w6939.ssltestndk;
 
 import android.Manifest;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import java.security.SecureRandom;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -21,61 +28,179 @@ public class MainActivity extends AppCompatActivity {
         System.loadLibrary("native-lib");
     }
 
+    private final DBop db = new DBop(this);
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         checkPermission();
-        shouter = new ServShouter();
-        shouter.start();
+
+
         // Example of a call to a native method
     }
 
-    private void work() {
+    private void waitStart() {
+        final MainActivity ctx = this;
+        Button btn = (Button) findViewById(R.id.button);
+        btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                TextView sign = findViewById(R.id.editText);
+                String sign_name = sign.getText().toString().trim();
+                if (sign_name == "") {
+                    Toast.makeText(ctx, "请输入识别名", Toast.LENGTH_SHORT).show();
+                } else {
+                    if(sign_name.length()>12) {
+                        sign_name = sign_name.substring(0, 12);
+                    }
+                    work(sign_name);
+                }
+            }
+        });
+    }
+
+    private void work(final String sign_name) {
+        shouter = new ServShouter();
+        shouter.start(sign_name);
         final TextView tv = (TextView) findViewById(R.id.sample_text);
-        tv.setText(stringFromJNI());
+        tv.setText("Working");
+
+        final Context context = this;
         final Server s = new Server((short) 9000);
         new Thread(new Runnable() {
             @Override
             public void run() {
                 s.run(new ServerCallback() {
                     @Override
-                    public void reqEnc(Server.Session s, Server server) {
+                    public void reqEnc(final Server.Session s, final Server server) {
                         handler.post(new Runnable() {
                             @Override
                             public void run() {
                                 String str = "REQ_ENC";
                                 tv.setText(str);
+                                String[] arr = s.info.split("\n");
+                                String username = arr[0];
+                                String filename = arr[1];
+                                s.info = username + "\n" + filename;
+                                new AlertDialog.Builder(context).setTitle("encryptfile from:" + username + "\nfile:" + filename).setPositiveButton("yes",
+                                        new DialogInterface.OnClickListener() {
+                                            @Override
+                                            public void onClick(DialogInterface dialog, int which) {
+                                                TextView tv = (TextView) findViewById(R.id.sample_text);
+                                                tv.setText("start to encrypt!");
+                                                final byte[] ret = new byte[256];// async cannt be placed outside
+                                                byte[] keyiv = new byte[32];
+                                                new SecureRandom().nextBytes(keyiv);
+                                                s.keyiv = keyiv;
+                                                ret[0] = Server.CMD_RSUCCESS;
+                                                System.arraycopy(keyiv, 0, ret, 4, 32);
+                                                new Thread(new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        server.response(s.session, ret, true);
+                                                    }
+                                                }).start();
+                                            }
+                                        }).setNegativeButton("no",
+                                        new DialogInterface.OnClickListener() {
+                                            @Override
+                                            public void onClick(DialogInterface dialog, int which) {
+                                                TextView tv = (TextView) findViewById(R.id.sample_text);
+                                                tv.setText("refused to encrypt!");
+                                                final byte[] ret = new byte[256];
+                                                ret[0] = Server.CMD_FAILED;
+                                                new Thread(new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        server.response(s.session, ret, true);
+                                                    }
+                                                }).start();
+                                            }
+                                        }).show();
                             }
                         });
-                        byte[] ret = new byte[256];
-                        ret[0] = Server.CMD_FAILED;
-                        server.response(s.session, ret, true);
                         return;
                     }
 
                     @Override
-                    public void reqDec(Server.Session s, Server server) {
+                    public void reqDec(final Server.Session s, final Server server) {
                         handler.post(new Runnable() {
                             @Override
                             public void run() {
                                 String str = "REQ_DEC";
                                 tv.setText(str);
+                                String[] arr = s.info.split("\n");
+                                String username = arr[0];
+                                String filename = arr[1];
+                                s.info = username + "\n" + filename;
+                                new AlertDialog.Builder(context).setTitle("decrypt from:\n" + username + "\n" + filename).setPositiveButton("yes",
+                                        new DialogInterface.OnClickListener() {
+                                            @Override
+                                            public void onClick(DialogInterface dialog, int which) {
+                                                TextView tv = (TextView) findViewById(R.id.sample_text);
+                                                tv.setText("start to decrypt!");
+                                                final byte[] ret = new byte[256];
+                                                byte[] keyiv = new byte[32];
+                                                byte[] rhash = new byte[32];
+
+                                                if (!db.getSession(s.hash, keyiv, rhash)) {
+                                                    ret[0] = Server.CMD_FAILED;
+                                                } else {
+                                                    ret[0] = Server.CMD_RSUCCESS;
+                                                    System.arraycopy(keyiv, 0, ret, 4, 32);
+                                                    System.arraycopy(rhash, 0, ret, 36, 32);
+                                                }
+                                                new Thread(new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        server.response(s.session, ret, false);
+                                                    }
+                                                }).start();
+                                            }
+                                        }).setNegativeButton("no",
+                                        new DialogInterface.OnClickListener() {
+                                            @Override
+                                            public void onClick(DialogInterface dialog, int which) {
+                                                TextView tv = (TextView) findViewById(R.id.sample_text);
+                                                tv.setText("refused to decrypt!");
+                                                final byte[] ret = new byte[256];
+                                                ret[0] = Server.CMD_FAILED;
+                                                new Thread(new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        server.response(s.session, ret, false);
+                                                    }
+                                                }).start();
+                                            }
+                                        }).show();
                             }
                         });
-                        byte[] ret = new byte[256];
-                        ret[0] = Server.CMD_FAILED;
-                        server.response(s.session, ret, false);
                         return;
                     }
 
                     @Override
-                    public void finish(Server.Session s) {
+                    public void finish(final Server.Session s) {
                         handler.post(new Runnable() {
                             @Override
                             public void run() {
                                 String str = "END";
                                 tv.setText(str);
+                                if (!db.saveSession(s)) {
+                                    handler.post(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            Toast.makeText(context, "Save failed!", Toast.LENGTH_SHORT).show();
+                                        }
+                                    });
+                                } else {
+                                    handler.post(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            Toast.makeText(context, "encrypt finish", Toast.LENGTH_SHORT).show();
+                                        }
+                                    });
+                                }
                             }
                         });
                     }
@@ -101,7 +226,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if (requestCode == PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE) {
-            work();
+            waitStart();
+            //work();
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
@@ -132,7 +258,8 @@ public class MainActivity extends AppCompatActivity {
 
         } else {
             Toast.makeText(this, "授权成功！", Toast.LENGTH_SHORT).show();
-            work();
+            waitStart();
+            //work();
         }
     }
 }
