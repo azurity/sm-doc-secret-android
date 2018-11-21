@@ -22,6 +22,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 1;
 
     private ServShouter shouter;
+    private Server serv;
 
     // Used to load the 'native-lib' library on application startup.
     static {
@@ -43,6 +44,8 @@ public class MainActivity extends AppCompatActivity {
     private void waitStart() {
         final MainActivity ctx = this;
         Button btn = (Button) findViewById(R.id.button);
+        TextView samp = findViewById((R.id.sample_text));
+        samp.setText("现有记录数量：" + String.valueOf(db.getCount()));
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -51,7 +54,7 @@ public class MainActivity extends AppCompatActivity {
                 if (sign_name == "") {
                     Toast.makeText(ctx, "请输入识别名", Toast.LENGTH_SHORT).show();
                 } else {
-                    if(sign_name.length()>12) {
+                    if (sign_name.length() > 12) {
                         sign_name = sign_name.substring(0, 12);
                     }
                     work(sign_name);
@@ -68,6 +71,7 @@ public class MainActivity extends AppCompatActivity {
 
         final Context context = this;
         final Server s = new Server((short) 9000);
+        serv = s;
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -134,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
                                 String username = arr[0];
                                 String filename = arr[1];
                                 s.info = username + "\n" + filename;
-                                new AlertDialog.Builder(context).setTitle("decrypt from:\n" + username + "\n" + filename).setPositiveButton("yes",
+                                new AlertDialog.Builder(context).setTitle("decrypt from:" + username + "\n" + filename).setPositiveButton("yes",
                                         new DialogInterface.OnClickListener() {
                                             @Override
                                             public void onClick(DialogInterface dialog, int which) {

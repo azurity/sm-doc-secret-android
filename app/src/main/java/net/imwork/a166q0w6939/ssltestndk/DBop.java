@@ -31,6 +31,14 @@ public class DBop extends SQLiteOpenHelper {
         onCreate(sqLiteDatabase);
     }
 
+    public int getCount() {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = db.query(TABLE_NAME,
+                new String[]{"hash"},
+                null, null, null, null, null);
+        return cursor.getCount();
+    }
+
     public boolean saveSession(Server.Session s) {
         SQLiteDatabase rdb = getReadableDatabase();
         Cursor cursor = rdb.query(TABLE_NAME,
@@ -51,10 +59,11 @@ public class DBop extends SQLiteOpenHelper {
         cval.put("rhash", Base64.encodeToString(s.rhash, Base64.DEFAULT));
         wdb.insertOrThrow(TABLE_NAME, null, cval);
         wdb.setTransactionSuccessful();
+        wdb.endTransaction();
         return true;
     }
 
-    public boolean getSession(byte[] hash,byte[] keyiv,byte[] rhash) {
+    public boolean getSession(byte[] hash, byte[] keyiv, byte[] rhash) {
         SQLiteDatabase db = getReadableDatabase();
         Cursor cursor = db.query(TABLE_NAME,
                 new String[]{"keyiv", "rhash"},
@@ -67,9 +76,9 @@ public class DBop extends SQLiteOpenHelper {
         }
         cursor.moveToFirst();
         byte[] ki = Base64.decode(cursor.getString(0), Base64.DEFAULT);
-		System.arraycopy(ki,0,keyiv,0,32);
-		byte[] rh = Base64.decode(cursor.getString(1), Base64.DEFAULT);
-		System.arraycopy(rh,0,rhash,0,32);
+        System.arraycopy(ki, 0, keyiv, 0, 32);
+        byte[] rh = Base64.decode(cursor.getString(1), Base64.DEFAULT);
+        System.arraycopy(rh, 0, rhash, 0, 32);
         cursor.close();
         return true;
     }
